@@ -2,20 +2,31 @@ import requests
 import pandas as pd
 import time
 import random
-from datetime import date
+from datetime import datetime, timedelta, date
 import os
 
 API_KEY = os.getenv("YOUTUBE_API_KEY")
-  # GitHub Action will inject this
 
 SEARCH_QUERIES = [
     "vc podcast", "venture capital podcast", "startup investing",
     "seed fund podcast", "angel investor podcast", "early stage investing",
-    "startup pitch", "tech investor podcast"
+    "startup pitch", "tech investor podcast", "founder interviews", "startup accelerator",
+    "funding podcast", "startup AMA", "startup mentors", "bootstrap founder podcast",
+    "angel network", "SaaS VC", "web3 VC", "fintech investor", "startup pitch event"
 ]
 
-MAX_RESULTS_PER_DAY = 150
+MAX_RESULTS_PER_DAY = 200
 RESULTS_PER_PAGE = 50
+HISTORY_FILE = "history.csv"
+PUBLISHED_AFTER_DAYS = 180  # Fetch videos only from last 6 months
+
+def load_history():
+    if os.path.exists(HISTORY_FILE):
+        return pd.read_csv(HISTORY_FILE)
+    return pd.DataFrame(columns=["Channel Name", "Channel URL", "Subscriber Count", "Date Added"])
+
+def save_history(df_history):
+    df_history.to_csv(HISTORY_FILE, index=False)
 
 def search_channel_ids(query, limit=150):
     channel_ids = set()
@@ -25,7 +36,8 @@ def search_channel_ids(query, limit=150):
         'type': 'channel',
         'q': query,
         'maxResults': RESULTS_PER_PAGE,
-        'key': API_KEY
+        'key': API_KEY,
+        'publishedAfter': (datetime.utcnow() - timedelta(days=PUBLISHED_AFTER_DAYS)).isoformat("T") + "Z"
     }
 
     fetched = 0
@@ -61,49 +73,43 @@ def get_channel_details(channel_ids):
     return all_data
 
 def run():
-    today = date.today().isoformat()
+    today_str = date.today().isoformat()
     all_leads = []
+    seen_urls = set()
     random.shuffle(SEARCH_QUERIES)
 
-    print("✅ API Key loaded:", bool(API_KEY))  # ← shows if the key was passed correctly
+    # Load historical memory
+    history_df = load_history()
+    seen_urls.update(history_df["Channel URL"].tolist())
 
     fetched = 0
     for query in SEARCH_QUERIES:
-        print(f"🔍 Searching for: {query}")
-        to_fetch = min(MAX_RESULTS_PER_DAY - fetched, RESULTS_PER_PAGE * 3)
-        ids = search_channel_ids(query, to_fetch)
-        print(f"→ Found {len(ids)} channels for: {query}")
-        details = get_channel_details(ids)
-        all_leads.extend(details)
-        fetched += len(details)
-        if fetched >= MAX_RESULTS_PER_DAY:
-            break
-
-    print(f"📦 Total leads collected: {len(all_leads)}")
-
-    df = pd.DataFrame(all_leads, columns=["Channel Name", "Channel URL", "Subscriber Count"])
-    df.drop_duplicates(subset=["Channel URL"], inplace=True)
-    filename = f"vc_leads_{today}.csv"
-    df.to_csv(filename, index=False)
-    print(f"✅ CSV generated: {filename}")
-
-    
-    fetched = 0
-    for query in SEARCH_QUERIES:
-        print(f"Searching for: {query}")
         to_fetch = min(MAX_RESULTS_PER_DAY - fetched, RESULTS_PER_PAGE * 3)
         ids = search_channel_ids(query, to_fetch)
         details = get_channel_details(ids)
-        all_leads.extend(details)
-        fetched += len(details)
+        for name, url, subs in details:
+            if url not in seen_urls and fetched < MAX_RESULTS_PER_DAY:
+                all_leads.append([name, url, subs, today_str])
+                seen_urls.add(url)
+                fetched += 1
         if fetched >= MAX_RESULTS_PER_DAY:
             break
 
-    df = pd.DataFrame(all_leads, columns=["Channel Name", "Channel URL", "Subscriber Count"])
-    df.drop_duplicates(subset=["Channel URL"], inplace=True)
-    filename = f"vc_leads_{today}.csv"
-    df.to_csv(filename, index=False)
-    print(f"✅ {len(df)} leads saved to {filename}")
+    # Save daily file
+    if all_leads:
+        df_new = pd.DataFrame(all_leads, columns=["Channel Name", "Channel URL", "Subscriber Count", "Date Added"])
+        filename = f"vc_leads_{today_str}.csv"
+        df_new.to_csv(filename, index=False)
+        print(f"✅ {len(df_new)} new leads saved to {filename}")
+
+        # Append to history
+        updated_history = pd.concat([history_df, df_new], ignore_index=True)
+        save_history(updated_history)
+    else:
+        print("⚠️ No new leads found today.")
+
+    if fetched < MAX_RESULTS_PER_DAY:
+        print(f"ℹ️ Only {fetched} unique leads were found today (goal: {MAX_RESULTS_PER_DAY})")
 
 if __name__ == "__main__":
     run()
