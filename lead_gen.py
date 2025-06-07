@@ -64,6 +64,29 @@ def run():
     today = date.today().isoformat()
     all_leads = []
     random.shuffle(SEARCH_QUERIES)
+
+    print("✅ API Key loaded:", bool(API_KEY))  # ← shows if the key was passed correctly
+
+    fetched = 0
+    for query in SEARCH_QUERIES:
+        print(f"🔍 Searching for: {query}")
+        to_fetch = min(MAX_RESULTS_PER_DAY - fetched, RESULTS_PER_PAGE * 3)
+        ids = search_channel_ids(query, to_fetch)
+        print(f"→ Found {len(ids)} channels for: {query}")
+        details = get_channel_details(ids)
+        all_leads.extend(details)
+        fetched += len(details)
+        if fetched >= MAX_RESULTS_PER_DAY:
+            break
+
+    print(f"📦 Total leads collected: {len(all_leads)}")
+
+    df = pd.DataFrame(all_leads, columns=["Channel Name", "Channel URL", "Subscriber Count"])
+    df.drop_duplicates(subset=["Channel URL"], inplace=True)
+    filename = f"vc_leads_{today}.csv"
+    df.to_csv(filename, index=False)
+    print(f"✅ CSV generated: {filename}")
+
     
     fetched = 0
     for query in SEARCH_QUERIES:
