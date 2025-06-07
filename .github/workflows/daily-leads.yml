@@ -10,8 +10,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout Code
-        uses: actions/upload-artifact@v4
-
+        uses: actions/checkout@v3  # ✅ this should be "checkout", not upload-artifact
 
       - name: Set up Python
         uses: actions/setup-python@v4
@@ -28,7 +27,7 @@ jobs:
         run: python lead_gen.py
 
       - name: Upload CSV Artifact
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4  # ✅ this is where v4 goes
         with:
           name: daily-vc-leads
           path: vc_leads_*.csv
