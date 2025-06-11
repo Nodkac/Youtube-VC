@@ -31,7 +31,7 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: daily-vc-leads
-          path: vc_leads_*.csv
+          path: vc_podcast_leads_*.csv  # ✅ Corrected filename
 
       - name: Upload Updated History
         uses: actions/upload-artifact@v4
