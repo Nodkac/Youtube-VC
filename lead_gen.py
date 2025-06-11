@@ -127,7 +127,8 @@ def run():
 
     # Save CSV (even if empty)
     df = pd.DataFrame(all_leads, columns=["Channel Name", "Channel URL", "Subscriber Count", "Date Added"])
-    filename = f"vc_podcast_leads_{today_str}.csv"
+    filename = f"vc_leads_{today_str}.csv"
+
     df.to_csv(filename, index=False)
 
     if len(df) == 0:
